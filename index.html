@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đêm Trăng Trung Thu 3D</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050817;font-family:Arial,sans-serif}
+  body{color:#fff}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #intro{
+    position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 35%,rgba(255,224,140,.14),rgba(4,7,22,.97) 55%);
+    transition:opacity .8s ease,visibility .8s ease;
+  }
+  #intro.hide{opacity:0;visibility:hidden;pointer-events:none}
+  .intro-card{text-align:center;padding:30px}
+  .intro-moon{
+    width:150px;height:150px;border-radius:50%;margin:0 auto 25px;
+    background:#fff1b0;box-shadow:0 0 35px #fff0a0,0 0 100px rgba(255,220,120,.4);
+  }
+  .intro-card h1{font-size:clamp(38px,7vw,78px);margin:0 0 10px;text-shadow:0 0 25px rgba(255,230,150,.55)}
+  .intro-card p{letter-spacing:4px;color:#e9dca8;margin:0 0 30px;font-size:12px}
+  button{
+    border:0;border-radius:999px;padding:14px 25px;font-size:16px;font-weight:bold;
+    cursor:pointer;background:#ffe59a;color:#3b2b0c;box-shadow:0 8px 30px rgba(255,221,125,.25);
+  }
+  button:hover{transform:translateY(-2px)}
+  #topbar{
+    position:fixed;z-index:5;top:18px;left:18px;right:18px;
+    display:flex;justify-content:space-between;align-items:center;pointer-events:none;
+  }
+  .badge{
+    padding:10px 14px;border:1px solid rgba(255,235,160,.25);border-radius:14px;
+    background:rgba(10,13,35,.38);backdrop-filter:blur(8px);color:#ffe9a5;
+    font-size:13px;letter-spacing:1px
+  }
+  #hint{
+    position:fixed;z-index:5;bottom:20px;left:50%;transform:translateX(-50%);
+    padding:11px 17px;border-radius:999px;background:rgba(10,13,35,.5);
+    border:1px solid rgba(255,235,160,.2);color:#f8e7ad;font-size:13px;
+    backdrop-filter:blur(8px);pointer-events:none;white-space:nowrap
+  }
+  #wish{
+    position:fixed;z-index:20;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.5);backdrop-filter:blur(4px);padding:20px
+  }
+  #wish.show{display:flex}
+  .wish-card{
+    width:min(520px,100%);padding:30px;border-radius:26px;text-align:center;
+    background:linear-gradient(145deg,rgba(35,25,57,.97),rgba(11,18,45,.97));
+    border:1px solid rgba(255,224,133,.35);box-shadow:0 25px 80px rgba(0,0,0,.55)
+  }
+  .wish-card .lantern{font-size:42px}
+  .wish-card h2{color:#ffe49a;margin:10px 0 18px}
+  #wishText{font-size:20px;line-height:1.65;color:#fff4d0;min-height:100px}
+  .close{margin-top:12px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="intro">
+  <div class="intro-card">
+    <div class="intro-moon"></div>
+    <h1>Đêm Trăng Trung Thu</h1>
+    <p>MỘT ĐÊM • MỘT ÁNH TRĂNG • NGÀN ƯỚC NGUYỆN</p>
+    <button id="enterBtn">Bước vào đêm trăng ✨</button>
+  </div>
+</div>
+
+<div id="topbar">
+  <div class="badge">🌕 Trung Thu An Lành</div>
+  <div class="badge">ÁNH TRĂNG • SUM VẦY • YÊU THƯƠNG</div>
+</div>
+
+<div id="hint">🏮 Chạm vào một chiếc đèn lồng để nhận lời chúc</div>
+
+<div id="wish">
+  <div class="wish-card">
+    <div class="lantern">🏮</div>
+    <h2>Lời Chúc Dưới Ánh Trăng</h2>
+    <div id="wishText"></div>
+    <button class="close" id="closeWish">Đóng lại</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050817);
+  scene.fog = new THREE.FogExp2(0x071027, 0.018);
+
+  const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, .1, 300);
+  camera.position.set(0, 9, 30);
+
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  const ambient = new THREE.AmbientLight(0x8797c7, 0.65);
+  scene.add(ambient);
+
+  const moonLight = new THREE.DirectionalLight(0xffe8b0, 1.1);
+  moonLight.position.set(-10,18,10);
+  moonLight.castShadow = true;
+  scene.add(moonLight);
+
+  const fill = new THREE.PointLight(0x738cff, 0.7, 70);
+  fill.position.set(10,7,12);
+  scene.add(fill);
+
+  const clock = new THREE.Clock();
+  const lanterns = [];
+  const rabbits = [];
+  const fireflies = [];
+  const petals = [];
+  const wishes = [
+    "🥮 Chúc bạn tiền đầy ví, bụng đầy bánh, tim đầy yêu thương… và deadline tự biến mất! 🤣",
+    "🌝 Người ta ngắm trăng, còn mình ngắm tài khoản ngân hàng. Chúc bạn Trung Thu lương về thật nhanh! 💸",
+    "🐰 Chúc bạn Trung Thu vui như trẻ con, giàu như đại gia, và người yêu thì… thôi, chuyện đó tính sau! 🤣"
+  ];
+
+  function mat(color, rough=.7, emissive=0x000000, ei=0){
+    return new THREE.MeshStandardMaterial({color,roughness:rough,emissive,emissiveIntensity:ei});
+  }
+
+  // Stars
+  const starGeo = new THREE.BufferGeometry();
+  const starCount = 900;
+  const pos = new Float32Array(starCount*3);
+  for(let i=0;i<starCount;i++){
+    const r = 80 + Math.random()*100;
+    const a = Math.random()*Math.PI*2;
+    const y = 10 + Math.random()*70;
+    pos[i*3]=Math.cos(a)*r;
+    pos[i*3+1]=y;
+    pos[i*3+2]=Math.sin(a)*r;
+  }
+  starGeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xfff1bd,size:.16,transparent:true,opacity:.85})));
+
+  // Moon
+  const moon = new THREE.Mesh(
+    new THREE.SphereGeometry(4.5,48,48),
+    new THREE.MeshBasicMaterial({color:0xffedb0})
+  );
+  moon.position.set(-12,16,-18);
+  scene.add(moon);
+
+  const moonGlow = new THREE.PointLight(0xffe9a4,1.5,45);
+  moonGlow.position.copy(moon.position);
+  scene.add(moonGlow);
+
+  // Clouds
+  function makeCloud(x,y,z,s){
+    const g=new THREE.Group();
+    const m=mat(0x6c7396,.95);
+    for(let i=0;i<6;i++){
+      const c=new THREE.Mesh(new THREE.SphereGeometry(1.3+Math.random()*.8,20,20),m);
+      c.position.set((i-2.5)*1.15,Math.random()*.7,Math.random()*.8);
+      g.add(c);
+    }
+    g.position.set(x,y,z); g.scale.setScalar(s); scene.add(g);
+    return g;
+  }
+  const clouds=[makeCloud(9,15,-15,1.4),makeCloud(-18,11,-10,1.1)];
+
+  // Ground
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(34,96),
+    mat(0x152d22,.95)
+  );
+  ground.rotation.x=-Math.PI/2;
+  ground.position.y=-1.2;
+  ground.receiveShadow=true;
+  scene.add(ground);
+
+  // Grass
+  const grassMat=mat(0x24522d,.95);
+  for(let i=0;i<350;i++){
+    const a=Math.random()*Math.PI*2;
+    const r=5+Math.random()*27;
+    const blade=new THREE.Mesh(new THREE.ConeGeometry(.035,.35+Math.random()*.35,4),grassMat);
+    blade.position.set(Math.cos(a)*r,-.98,Math.sin(a)*r);
+    scene.add(blade);
+  }
+
+  // Tree
+  const tree=new THREE.Group();
+  tree.position.y=-1;
+  scene.add(tree);
+
+  const trunk=new THREE.Mesh(
+    new THREE.CylinderGeometry(1.2,1.7,8,18),
+    mat(0x57351f,.95)
+  );
+  trunk.position.y=3;
+  trunk.castShadow=true;
+  tree.add(trunk);
+
+  // Roots
+  for(let i=0;i<7;i++){
+    const root=new THREE.Mesh(new THREE.ConeGeometry(.5,.25,7),mat(0x4a2b19,.95));
+    root.rotation.z=(Math.PI/2)*(i%2?1:-1);
+    root.rotation.y=i*Math.PI*2/7;
+    root.position.set(Math.cos(i*Math.PI*2/7)*1.3,-.7,Math.sin(i*Math.PI*2/7)*1.3);
+    root.scale.z=2;
+    tree.add(root);
+  }
+
+  // Branches
+  for(let i=0;i<7;i++){
+    const b=new THREE.Mesh(new THREE.CylinderGeometry(.25,.5,5,10),mat(0x57351f,.95));
+    b.position.set(Math.cos(i*Math.PI*2/7)*1.8,6,Math.sin(i*Math.PI*2/7)*1.8);
+    b.rotation.z=(Math.random()-.5)*.9;
+    b.rotation.x=(Math.random()-.5)*.9;
+    tree.add(b);
+  }
+
+  const foliageMat=mat(0x1d5b35,.9);
+  for(let i=0;i<18;i++){
+    const f=new THREE.Mesh(new THREE.SphereGeometry(2.7+Math.random()*1.5,24,18),foliageMat);
+    f.position.set((Math.random()-.5)*7,6.5+Math.random()*4,(Math.random()-.5)*6);
+    f.scale.y=.75+Math.random()*.35;
+    f.castShadow=true;
+    tree.add(f);
+  }
+
+  // Pond
+  const pond=new THREE.Mesh(
+    new THREE.CircleGeometry(6.5,64),
+    new THREE.MeshPhysicalMaterial({color:0x183c52,roughness:.18,metalness:.1,transparent:true,opacity:.72})
+  );
+  pond.rotation.x=-Math.PI/2;
+  pond.position.set(10,-1.05,-3);
+  scene.add(pond);
+
+  const pondGlow=new THREE.PointLight(0x79a8d0,.45,18);
+  pondGlow.position.set(10,.5,-3);
+  scene.add(pondGlow);
+
+  // Lantern
+  function createLantern(x,y,z,scale){
+    const g=new THREE.Group();
+    const bodyMat=mat(0xffc928,.55,0xffa000,.35);
+    const redMat=mat(0x9d2c20,.65,0x551000,.1);
+    const body=new THREE.Mesh(new THREE.SphereGeometry(1,20,14),bodyMat);
+    body.scale.set(.75,1.05,.75);
+    g.add(body);
+
+    const cap1=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.16,16),redMat);
+    cap1.position.y=1.02; g.add(cap1);
+    const cap2=cap1.clone(); cap2.position.y=-1.02; g.add(cap2);
+
+    const line=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,1.5,8),redMat);
+    line.position.y=1.75; g.add(line);
+
+    for(let i=0;i<5;i++){
+      const tassel=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.65,6),redMat);
+      tassel.position.set((i-2)*.13,-1.42,0);
+      g.add(tassel);
+    }
+
+    const light=new THREE.PointLight(0xffc52c,1.4,7);
+    light.position.y=0;
+    g.add(light);
+
+    g.position.set(x,y,z);
+    g.scale.setScalar(scale);
+    g.userData.baseY=y;
+    g.userData.phase=Math.random()*Math.PI*2;
+    g.userData.light=light;
+    g.userData.body=body;
+    scene.add(g);
+    lanterns.push(g);
+  }
+
+  for(let i=0;i<18;i++){
+    const a=i/18*Math.PI*2;
+    const r=8+Math.random()*10;
+    createLantern(Math.cos(a)*r,6+Math.random()*8,Math.sin(a)*r-.5,.55+Math.random()*.25);
+  }
+
+  // Rabbits
+  function createRabbit(color, x,z){
+    const g=new THREE.Group();
+    const fur=mat(color,.9);
+    const pink=mat(0xff9ca9,.8);
+
+    const body=new THREE.Mesh(new THREE.SphereGeometry(1,18,14),fur);
+    body.scale.set(1.15,.8,1.45); body.position.y=1.15; g.add(body);
+
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.75,18,14),fur);
+    head.position.set(0,2.15,.25); g.add(head);
+
+    for(const s of [-1,1]){
+      const ear=new THREE.Mesh(new THREE.CylinderGeometry(.18,.27,1.65,12),fur);
+      ear.position.set(s*.3,3.25,.25);
+      ear.rotation.z=s*.16;
+      g.add(ear);
+      const inner=new THREE.Mesh(new THREE.CylinderGeometry(.09,.13,1.35,10),pink);
+      inner.position.set(s*.3,3.25,.38);
+      inner.rotation.z=s*.16;
+      g.add(inner);
+    }
+
+    const eyeMat=mat(0x111111,.4);
+    for(const s of [-1,1]){
+      const eye=new THREE.Mesh(new THREE.SphereGeometry(.075,10,10),eyeMat);
+      eye.position.set(s*.27,2.28,.92); g.add(eye);
+    }
+
+    const tail=new THREE.Mesh(new THREE.SphereGeometry(.38,14,12),fur);
+    tail.position.set(0,1.15,-1.35); g.add(tail);
+
+    g.position.set(x,0,z);
+    g.userData.angle=Math.atan2(z,x);
+    g.userData.radius=Math.sqrt(x*x+z*z);
+    g.userData.speed=.45+Math.random()*.18;
+    g.userData.phase=Math.random()*Math.PI*2;
+    scene.add(g);
+    rabbits.push(g);
+  }
+
+  createRabbit(0xf5f0dc,8,0);
+  createRabbit(0xd7d9e8,-8,1);
+
+  // Fireflies
+  const flyMat=new THREE.PointsMaterial({color:0xffe97b,size:.13,transparent:true,opacity:.9});
+  const flyGeo=new THREE.BufferGeometry();
+  const fp=new Float32Array(180*3);
+  for(let i=0;i<180;i++){
+    const a=Math.random()*Math.PI*2,r=5+Math.random()*22;
+    fp[i*3]=Math.cos(a)*r;
+    fp[i*3+1]=Math.random()*9;
+    fp[i*3+2]=Math.sin(a)*r;
+  }
+  flyGeo.setAttribute('position',new THREE.BufferAttribute(fp,3));
+  const flyPoints=new THREE.Points(flyGeo,flyMat);
+  scene.add(flyPoints);
+
+  // Petals
+  const petalMat=mat(0xffb9c8,.8);
+  for(let i=0;i<45;i++){
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(.14,.28),petalMat);
+    p.position.set((Math.random()-.5)*24,2+Math.random()*10,(Math.random()-.5)*24);
+    p.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);
+    p.userData.phase=Math.random()*6;
+    scene.add(p);
+    petals.push(p);
+  }
+
+  // Raycaster / lantern click
+  const raycaster=new THREE.Raycaster();
+  const mouse=new THREE.Vector2();
+
+  // Đánh dấu tất cả bộ phận của đèn lồng để việc click chính xác hơn
+  lanterns.forEach(lantern => {
+    lantern.traverse(obj => {
+      if(obj.isMesh) obj.userData.parentLantern = lantern;
+    });
+  });
+
+  function updateMouse(e){
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+    mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  }
+
+  renderer.domElement.addEventListener('pointermove', updateMouse);
+  renderer.domElement.addEventListener('pointerdown', (e)=>{
+    updateMouse(e);
+    raycaster.setFromCamera(mouse,camera);
+
+    const objects=[];
+    lanterns.forEach(l=>l.traverse(o=>{
+      if(o.isMesh) objects.push(o);
+    }));
+
+    const hits=raycaster.intersectObjects(objects,false);
+    if(!hits.length) return;
+
+    const selected=hits[0].object.userData.parentLantern;
+    if(!selected) return;
+
+    selected.userData.light.intensity=4.5;
+    selected.userData.body.material.emissive.setHex(0xffd83d);
+    selected.userData.body.material.emissiveIntensity=1.8;
+
+    let nextWish;
+    do {
+      nextWish = wishes[Math.floor(Math.random()*wishes.length)];
+    } while (wishes.length > 1 && nextWish === window.lastWish);
+    window.lastWish = nextWish;
+
+    document.getElementById('wishText').textContent = nextWish;
+    document.getElementById('wish').classList.add('show');
+
+    setTimeout(()=>{
+      selected.userData.light.intensity=1.4;
+      selected.userData.body.material.emissiveIntensity=.35;
+    },1800);
+  });
+
+  document.getElementById('enterBtn').onclick=()=>{
+    document.getElementById('intro').classList.add('hide');
+  };
+  document.getElementById('closeWish').onclick=()=>{
+    document.getElementById('wish').classList.remove('show');
+  };
+  document.getElementById('wish').addEventListener('click',e=>{
+    if(e.target.id==='wish') document.getElementById('wish').classList.remove('show');
+  });
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const t=clock.getElapsedTime();
+
+    lanterns.forEach((l,i)=>{
+      l.position.y=l.userData.baseY+Math.sin(t*0.8+l.userData.phase)*.28;
+      l.rotation.y=Math.sin(t*.4+l.userData.phase)*.15;
+    });
+
+    rabbits.forEach((r,i)=>{
+      r.userData.angle += r.userData.speed*.006;
+      const a=r.userData.angle;
+      r.position.x=Math.cos(a)*r.userData.radius;
+      r.position.z=Math.sin(a)*r.userData.radius;
+      r.position.y=Math.max(0,Math.abs(Math.sin(t*3+r.userData.phase))*.45-.05);
+      r.rotation.y=-a+Math.PI/2;
+    });
+
+    clouds[0].position.x=9+Math.sin(t*.035)*3;
+    clouds[1].position.x=-18+Math.sin(t*.025+2)*2.5;
+
+    petals.forEach((p,i)=>{
+      p.position.y-=.006;
+      p.rotation.z+=.003;
+      if(p.position.y<-.8){
+        p.position.y=10+Math.random()*4;
+        p.position.x=(Math.random()-.5)*24;
+        p.position.z=(Math.random()-.5)*24;
+      }
+    });
+
+    flyMat.opacity=.55+.35*(Math.sin(t*2)+1)/2;
+    flyPoints.rotation.y=t*.008;
+
+    camera.position.x=Math.sin(t*.08)*2.2;
+    camera.position.y=8.5+Math.sin(t*.11)*.35;
+    camera.lookAt(0,4.5,0);
+
+    renderer.render(scene,camera);
+  }
+
+  addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+
+  animate();
+})();
+</script>
+</body>
+</html>
